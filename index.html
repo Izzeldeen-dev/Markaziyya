@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Al Markaziyya × OrderTech — Dashboard</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0D0D0D;font-family:'Segoe UI',Tahoma,system-ui,sans-serif;color:#EFEFEF;min-height:100vh}
+input,button,select{font-family:inherit}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#1A1A1A}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.4);cursor:pointer}
+input:focus{outline:none;border-color:#C0392B !important}
+button:hover{opacity:.85}
+
+.hdr{background:linear-gradient(135deg,#A93226 0%,#C0392B 55%,#7B241C 100%);padding:15px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hdr-title{color:#fff;font-weight:700;font-size:18px;letter-spacing:-.3px}
+.hdr-sub{color:rgba(255,255,255,.55);font-size:11px;margin-top:3px;letter-spacing:2px;text-transform:uppercase}
+.hdr-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.hdr-badge{background:rgba(0,0,0,.25);color:rgba(255,255,255,.9);font-size:12px;padding:4px 12px;border-radius:20px;font-weight:500;display:flex;align-items:center;gap:6px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#888;flex-shrink:0;transition:background .3s}
+.sync-dot.live{background:#27AE60;animation:pulse 2s infinite}
+.sync-dot.error{background:#C0392B}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.nav{display:flex;background:#111;border-bottom:1px solid #1E1E1E;padding:0 24px;gap:4px;flex-wrap:wrap}
+.nav-btn{padding:11px 20px;cursor:pointer;font-size:13px;background:none;border:none;border-bottom:2px solid transparent;color:#666;transition:all .15s;white-space:nowrap}
+.nav-btn.active{color:#C0392B;border-bottom-color:#C0392B;font-weight:600}
+
+.body{padding:20px 24px}
+.tab{display:none}.tab.active{display:block}
+
+.pill-row{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.pill{padding:7px 20px;border-radius:20px;font-size:13px;cursor:pointer;border:1px solid #2A2A2A;background:transparent;color:#777;transition:all .2s}
+.pill.active{background:#C0392B;color:#fff;border-color:#C0392B;font-weight:600}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.kpi-card{background:#161616;border-radius:10px;padding:15px 18px;transition:transform .15s}
+.kpi-card:hover{transform:translateY(-2px)}
+.kpi-label{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-weight:600}
+.kpi-value{font-size:26px;font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.kpi-sub{font-size:11px;color:#3A3A3A;margin-top:4px}
+
+.summary-bar{background:#0F0F0F;border:1px solid #1E1E1E;border-radius:10px;padding:10px 18px;margin-bottom:16px;display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+
+.card{background:#161616;border-radius:10px;padding:18px 20px;margin-bottom:14px}
+.card-title{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:1.2px;font-weight:600;margin-bottom:16px}
+.chart-wrap{position:relative}
+.legend{display:flex;gap:18px;margin-top:12px;justify-content:center;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:#666}
+.legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block}
+.charts-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+
+.form-card{background:#161616;border-radius:10px;padding:20px 22px;margin-bottom:16px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.f-group{display:flex;flex-direction:column;gap:6px}
+.f-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.f-input{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:8px;padding:11px 14px;color:#EFEFEF;font-size:15px;width:100%;transition:border-color .2s}
+.f-input:hover{border-color:#333}
+.save-btn{width:100%;padding:14px;border-radius:9px;border:none;cursor:pointer;font-size:15px;font-weight:600;color:#fff;letter-spacing:.3px;transition:background .3s}
+.save-btn.idle{background:#C0392B}.save-btn.ok{background:#1E8449}.save-btn.saving{background:#555}
+
+.preview-card{background:#161616;border-radius:10px;padding:18px 22px;border-left:3px solid #C0392B;margin-top:0}
+.preview-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1C1C1C;font-size:13px}
+.preview-row:last-child{border-bottom:none}
+
+.tbl-card{background:#161616;border-radius:10px;padding:18px 20px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:750px}
+th{text-align:left;padding:10px 14px;color:#444;font-weight:600;border-bottom:1px solid #222;font-size:10px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid #1A1A1A;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.del-btn{background:none;border:1px solid #2A2A2A;border-radius:5px;color:#444;padding:4px 10px;cursor:pointer;font-size:11px}
+.del-btn:hover{border-color:#C0392B;color:#C0392B}
+.del-yes{background:#C0392B;border:none;border-radius:4px;color:#fff;padding:4px 10px;cursor:pointer;font-size:11px;margin-right:4px}
+.del-no{background:none;border:1px solid #333;border-radius:4px;color:#666;padding:4px 10px;cursor:pointer;font-size:11px}
+
+.empty{text-align:center;padding:80px 20px}
+.empty-icon{font-size:56px;opacity:.08;margin-bottom:16px}
+.empty-text{color:#444;font-size:15px;margin-bottom:10px}
+.empty-link{background:none;border:none;color:#C0392B;font-size:13px;cursor:pointer;text-decoration:underline}
+.loading{text-align:center;padding:60px;color:#444;font-size:14px}
+.save-msg{font-size:12px;margin-top:8px;color:#27AE60;display:none}
+
+@media(max-width:600px){
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .charts-2{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .hdr{flex-direction:column;align-items:flex-start}
+  .summary-bar{gap:12px}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <div class="hdr-title">&#x645;&#x637;&#x639;&#x645; &#x627;&#x644;&#x645;&#x631;&#x643;&#x632;&#x64A;&#x629; &nbsp;&#xD7;&nbsp; <span style="font-family:monospace;letter-spacing:2px">OrderTech</span></div>
+    <div class="hdr-sub">Call Center Performance Dashboard</div>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-badge">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-status">Connecting...</span>
+    </div>
+    <div style="color:rgba(255,255,255,.35);font-size:10px" id="today-date"></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <button class="nav-btn active" id="nav-dashboard" onclick="switchTab('dashboard')">&#x1F4CA; Dashboard</button>
+  <button class="nav-btn" id="nav-input"     onclick="switchTab('input')">&#x2795; Add Data</button>
+  <button class="nav-btn" id="nav-records"   onclick="switchTab('records')">&#x1F4CB; Records</button>
+</div>
+
+<div class="body">
+
+  <!-- DASHBOARD -->
+  <div class="tab active" id="tab-dashboard">
+    <div class="pill-row">
+      <button class="pill"        id="pill-daily"   onclick="switchView('daily')">Today</button>
+      <button class="pill active" id="pill-weekly"  onclick="switchView('weekly')">Last 7 Days</button>
+      <button class="pill"        id="pill-monthly" onclick="switchView('monthly')">This Month</button>
+    </div>
+    <div id="dash-body"><div class="loading">&#x1F504; Connecting to database...</div></div>
+  </div>
+
+  <!-- ADD DATA -->
+  <div class="tab" id="tab-input" style="max-width:580px">
+    <div class="form-card">
+      <div class="card-title">Daily Entry</div>
+      <div style="margin-bottom:18px">
+        <div class="f-label" style="color:#C0392B;margin-bottom:7px">Date</div>
+        <input type="date" class="f-input" id="f-date" onchange="showPreview()"/>
+      </div>
+      <div class="form-grid">
+        <div class="f-group">
+          <div class="f-label" style="color:#27AE60">Answered Calls</div>
+          <input type="number" class="f-input" id="f-answered" placeholder="e.g. 120" min="0"/>
+        </div>
+        <div class="f-group">
+          <div class="f-label" style="color:#2980B9">Outbound Calls</div>
+          <input type="number" class="f-input" id="f-outbound" placeholder="e.g. 45" min="0"/>
+        </div>
+        <div class="f-group">
+          <div class="f-label" style="color:#C0392B">Missed Calls</div>
+          <input type="number" class="f-input" id="f-missed" placeholder="e.g. 15" min="0"/>
+        </div>
+        <div class="f-group">
+          <div class="f-label" style="color:#F39C12">SLA (%)</div>
+          <input type="number" class="f-input" id="f-sla" placeholder="e.g. 92.5" step="0.1" min="0" max="100"/>
+        </div>
+        <div class="f-group">
+          <div class="f-label" style="color:#E67E22">Abandon Rate (%)</div>
+          <input type="number" class="f-input" id="f-abandon" placeholder="e.g. 8.2" step="0.1" min="0" max="100"/>
+        </div>
+        <div class="f-group">
+          <div class="f-label" style="color:#9B59B6">Avg Handle Time (min)</div>
+          <input type="number" class="f-input" id="f-handle" placeholder="e.g. 4.5" step="0.1" min="0"/>
+        </div>
+      </div>
+      <div style="margin-bottom:18px">
+        <div class="f-label" style="color:#555;margin-bottom:7px">Added by</div>
+        <input type="text" class="f-input" id="f-agent" placeholder="e.g. Rami, Noor..."/>
+      </div>
+      <button class="save-btn idle" id="save-btn" onclick="saveEntry()">Save Daily Entry</button>
+      <div class="save-msg" id="save-msg"></div>
+    </div>
+    <div id="entry-preview"></div>
+  </div>
+
+  <!-- RECORDS -->
+  <div class="tab" id="tab-records">
+    <div id="records-body"><div class="loading">Loading...</div></div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════
+// FIREBASE CONFIG — Al Markaziyya
+// ══════════════════════════════════════
+var firebaseConfig = {
+  apiKey:            "AIzaSyCaEJOD5PP3mk9XaPkrG_NsbmMj__7K3PM",
+  authDomain:        "markaziyya-d14fd.firebaseapp.com",
+  databaseURL:       "https://markaziyya-d14fd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "markaziyya-d14fd",
+  storageBucket:     "markaziyya-d14fd.firebasestorage.app",
+  messagingSenderId: "821492235905",
+  appId:             "1:821492235905:web:b02d4706e18c5269199780"
+};
+
+firebase.initializeApp(firebaseConfig);
+var db = firebase.database();
+
+// ══════════════════════════════════════
+// STATE
+// ══════════════════════════════════════
+var allData  = [];
+var curView  = 'weekly';
+var myCharts = {};
+
+// ── Init ──────────────────────────────
+document.getElementById('f-date').value = todayStr();
+document.getElementById('today-date').textContent =
+  new Date().toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', year:'numeric'});
+
+// ── Real-time listener ────────────────
+db.ref('daily_entries').orderByChild('date').on('value', function(snapshot) {
+  allData = [];
+  snapshot.forEach(function(child) { allData.push(child.val()); });
+  allData.sort(function(a,b){ return a.date.localeCompare(b.date); });
+
+  var dot = document.getElementById('sync-dot');
+  var st  = document.getElementById('sync-status');
+  dot.className = 'sync-dot live';
+  st.textContent = 'Live \u2022 ' + allData.length + ' entries';
+
+  destroyCharts();
+  renderDash();
+  showPreview();
+}, function(err) {
+  document.getElementById('sync-dot').className = 'sync-dot error';
+  document.getElementById('sync-status').textContent = 'Error — check rules';
+  console.error(err);
+});
+
+// ══════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════
+function todayStr()  { return new Date().toISOString().slice(0,10); }
+function fmtShort(s) { return new Date(s+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); }
+function fmtLong(s)  { return new Date(s+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}); }
+function sum(data,k) { return data.reduce(function(a,d){ return a+(+d[k]||0); }, 0); }
+function avg(data,k) { return data.length ? sum(data,k)/data.length : 0; }
+
+// ══════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════
+function switchTab(name) {
+  ['dashboard','input','records'].forEach(function(t) {
+    document.getElementById('tab-'+t).classList.remove('active');
+    document.getElementById('nav-'+t).classList.remove('active');
+  });
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+  if (name === 'records')   renderRecords();
+  if (name === 'dashboard') { destroyCharts(); renderDash(); }
+}
+
+function switchView(v) {
+  curView = v;
+  ['daily','weekly','monthly'].forEach(function(p) {
+    document.getElementById('pill-'+p).classList.remove('active');
+  });
+  document.getElementById('pill-'+v).classList.add('active');
+  destroyCharts();
+  renderDash();
+}
+
+function getViewData() {
+  var now = new Date();
+  if (curView === 'daily') return allData.slice(-1);
+  if (curView === 'weekly') {
+    var ago = new Date(now); ago.setDate(ago.getDate()-7);
+    return allData.filter(function(d){ return new Date(d.date) >= ago; });
+  }
+  var start = new Date(now.getFullYear(), now.getMonth(), 1);
+  return allData.filter(function(d){ return new Date(d.date) >= start; });
+}
+
+function destroyCharts() {
+  Object.keys(myCharts).forEach(function(k){ try{ myCharts[k].destroy(); }catch(e){} });
+  myCharts = {};
+}
+
+// ══════════════════════════════════════
+// DASHBOARD RENDER
+// ══════════════════════════════════════
+function renderDash() {
+  var vd = getViewData();
+  var el = document.getElementById('dash-body');
+  if (!el) return;
+
+  if (vd.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F4E1;</div><div class="empty-text">No data for this period</div><button class="empty-link" onclick="switchTab(\'input\')">Add Data &#x2192;</button></div>';
+    return;
+  }
+
+  var total  = sum(vd,'answered') + sum(vd,'outbound') + sum(vd,'missed');
+  var res    = total > 0 ? Math.round((sum(vd,'answered')/total)*100) : 0;
+  var sub    = vd.length > 1;
+  var labels = vd.map(function(d){ return fmtShort(d.date); });
+
+  el.innerHTML =
+    '<div class="kpi-grid">'
+    + kpiCard('Answered Calls',  sum(vd,'answered').toLocaleString(), '#27AE60', sub ? 'avg '+Math.round(avg(vd,'answered'))+'/day' : '')
+    + kpiCard('Outbound Calls',  sum(vd,'outbound').toLocaleString(), '#2980B9', sub ? 'avg '+Math.round(avg(vd,'outbound'))+'/day' : '')
+    + kpiCard('Missed Calls',    sum(vd,'missed').toLocaleString(),   '#C0392B', sub ? 'avg '+Math.round(avg(vd,'missed'))+'/day'   : '')
+    + kpiCard('SLA',             avg(vd,'sla').toFixed(1)+'%',         '#F39C12', '')
+    + kpiCard('Abandon Rate',    avg(vd,'abandonRate').toFixed(1)+'%', '#E67E22', '')
+    + kpiCard('Avg Handle Time', avg(vd,'avgHandle').toFixed(1)+' min','#9B59B6', '')
+    + '</div>'
+    + '<div class="summary-bar">'
+    + '<span style="font-size:10px;color:#3A3A3A;text-transform:uppercase;letter-spacing:1.2px">Period</span>'
+    + '<span style="font-size:13px;color:#777"><b style="color:#EFEFEF;font-weight:700;margin-right:4px">'+total.toLocaleString()+'</b>total calls</span>'
+    + '<span style="font-size:13px;color:#777"><b style="color:#EFEFEF;font-weight:700;margin-right:4px">'+vd.length+'</b>days</span>'
+    + '<span style="font-size:13px;color:#777;margin-left:auto">Resolution: <b style="color:#27AE60;font-weight:700">'+res+'%</b></span>'
+    + '</div>'
+    + '<div class="card"><div class="card-title">Calls Volume</div><div class="chart-wrap" style="height:230px"><canvas id="ch-vol"></canvas></div>'
+    + '<div class="legend"><span class="legend-item"><span class="legend-dot" style="background:#27AE60"></span>Answered</span>'
+    + '<span class="legend-item"><span class="legend-dot" style="background:#2980B9"></span>Outbound</span>'
+    + '<span class="legend-item"><span class="legend-dot" style="background:#C0392B"></span>Missed</span></div></div>'
+    + '<div class="charts-2">'
+    + '<div class="card" style="margin-bottom:0"><div class="card-title">SLA %</div><div class="chart-wrap" style="height:180px"><canvas id="ch-sla"></canvas></div></div>'
+    + '<div class="card" style="margin-bottom:0"><div class="card-title">Abandon Rate %</div><div class="chart-wrap" style="height:180px"><canvas id="ch-abn"></canvas></div></div>'
+    + '</div><div style="height:14px"></div>'
+    + '<div class="card"><div class="card-title">Average Handle Time (min)</div><div class="chart-wrap" style="height:180px"><canvas id="ch-hdl"></canvas></div></div>';
+
+  buildCharts(vd, labels);
+}
+
+function kpiCard(label, value, color, sub) {
+  return '<div class="kpi-card" style="border-left:3px solid '+color+'">'
+    + '<div class="kpi-label">'+label+'</div>'
+    + '<div class="kpi-value" style="color:'+color+'">'+value+'</div>'
+    + (sub ? '<div class="kpi-sub">'+sub+'</div>' : '')
+    + '</div>';
+}
+
+function buildCharts(vd, labels) {
+  var gc = '#1C1C1C', tc = '#444';
+  var ax = { grid:{color:gc,drawBorder:false}, ticks:{color:tc,font:{size:11}}, border:{display:false} };
+  var tt = { backgroundColor:'#1E1E1E', borderColor:'#2A2A2A', borderWidth:1, titleColor:'#888', bodyColor:'#CCC', padding:10, cornerRadius:8 };
+
+  myCharts.vol = new Chart(document.getElementById('ch-vol'), {
+    type:'bar',
+    data:{ labels:labels, datasets:[
+      {label:'Answered', data:vd.map(function(d){return d.answered;}), backgroundColor:'#27AE60', borderRadius:3, borderSkipped:false},
+      {label:'Outbound', data:vd.map(function(d){return d.outbound;}), backgroundColor:'#2980B9', borderRadius:3, borderSkipped:false},
+      {label:'Missed',   data:vd.map(function(d){return d.missed;}),   backgroundColor:'#C0392B', borderRadius:3, borderSkipped:false},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:tt}, scales:{x:ax,y:ax}, categoryPercentage:0.7, barPercentage:0.85 }
+  });
+
+  myCharts.sla = new Chart(document.getElementById('ch-sla'), {
+    type:'line',
+    data:{ labels:labels, datasets:[{label:'SLA %', data:vd.map(function(d){return d.sla;}), borderColor:'#F39C12', backgroundColor:'rgba(243,156,18,.15)', borderWidth:2, fill:true, tension:0.3, pointBackgroundColor:'#F39C12', pointRadius:4}]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{...tt, callbacks:{label:function(c){return ' '+parseFloat(c.formattedValue).toFixed(1)+'%';}}}}, scales:{x:ax, y:{...ax, min:0, max:100, ticks:{...ax.ticks, callback:function(v){return v+'%';}}}}}
+  });
+
+  myCharts.abn = new Chart(document.getElementById('ch-abn'), {
+    type:'line',
+    data:{ labels:labels, datasets:[{label:'Abandon %', data:vd.map(function(d){return d.abandonRate;}), borderColor:'#E67E22', backgroundColor:'rgba(230,126,34,.15)', borderWidth:2, fill:true, tension:0.3, pointBackgroundColor:'#E67E22', pointRadius:4}]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{...tt, callbacks:{label:function(c){return ' '+parseFloat(c.formattedValue).toFixed(1)+'%';}}}}, scales:{x:ax, y:{...ax, min:0, max:100, ticks:{...ax.ticks, callback:function(v){return v+'%';}}}}}
+  });
+
+  myCharts.hdl = new Chart(document.getElementById('ch-hdl'), {
+    type:'line',
+    data:{ labels:labels, datasets:[{label:'Avg Handle', data:vd.map(function(d){return d.avgHandle;}), borderColor:'#9B59B6', backgroundColor:'rgba(155,89,182,.1)', borderWidth:2.5, fill:true, tension:0.3, pointBackgroundColor:'#9B59B6', pointRadius:4, pointHoverRadius:7}]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:tt}, scales:{x:ax,y:ax}}
+  });
+}
+
+// ══════════════════════════════════════
+// SAVE ENTRY
+// ══════════════════════════════════════
+function saveEntry() {
+  var date = document.getElementById('f-date').value;
+  if (!date) { alert('Please select a date'); return; }
+
+  var entry = {
+    date:        date,
+    answered:    parseFloat(document.getElementById('f-answered').value) || 0,
+    outbound:    parseFloat(document.getElementById('f-outbound').value) || 0,
+    missed:      parseFloat(document.getElementById('f-missed').value)   || 0,
+    sla:         parseFloat(document.getElementById('f-sla').value)      || 0,
+    abandonRate: parseFloat(document.getElementById('f-abandon').value)  || 0,
+    avgHandle:   parseFloat(document.getElementById('f-handle').value)   || 0,
+    addedBy:     document.getElementById('f-agent').value.trim() || 'Team',
+    updatedAt:   new Date().toISOString(),
+  };
+
+  var btn = document.getElementById('save-btn');
+  var msg = document.getElementById('save-msg');
+  btn.textContent = 'Saving...'; btn.className = 'save-btn saving';
+
+  // Use date as key — overwrites same day entry (upsert)
+  db.ref('daily_entries/' + date).set(entry)
+    .then(function() {
+      btn.innerHTML = '&#x2713; Saved & Synced!'; btn.className = 'save-btn ok';
+      msg.textContent = 'Saved to cloud — visible to everyone now.';
+      msg.style.display = 'block';
+      setTimeout(function() {
+        btn.textContent = 'Save Daily Entry'; btn.className = 'save-btn idle';
+        msg.style.display = 'none';
+      }, 3000);
+      ['answered','outbound','missed','sla','abandon','handle'].forEach(function(id) {
+        document.getElementById('f-'+id).value = '';
+      });
+    })
+    .catch(function(err) {
+      btn.textContent = 'Error — try again'; btn.className = 'save-btn idle';
+      alert('Save failed: ' + err.message + '\n\nMake sure Realtime Database rules allow write.');
+    });
+}
+
+function showPreview() {
+  var date = document.getElementById('f-date') ? document.getElementById('f-date').value : '';
+  var ex   = allData.find(function(d){ return d.date === date; });
+  var el   = document.getElementById('entry-preview');
+  if (!el) return;
+  if (!ex) { el.innerHTML = ''; return; }
+
+  var rows = [
+    ['Answered Calls', ex.answered,           '#27AE60'],
+    ['Outbound Calls', ex.outbound,            '#2980B9'],
+    ['Missed Calls',   ex.missed,              '#C0392B'],
+    ['SLA',            ex.sla+'%',             '#F39C12'],
+    ['Abandon Rate',   ex.abandonRate+'%',     '#E67E22'],
+    ['Avg Handle',     ex.avgHandle+' min',    '#9B59B6'],
+    ['Added by',       ex.addedBy||'—',        '#555'   ],
+  ];
+
+  el.innerHTML = '<div class="preview-card"><div class="card-title">Existing — '+fmtLong(date)+'</div>'
+    + rows.map(function(r){
+        return '<div class="preview-row"><span style="color:#555">'+r[0]+'</span>'
+             + '<span style="color:'+r[2]+';font-weight:600">'+r[1]+'</span></div>';
+      }).join('')
+    + '</div>';
+}
+
+// ══════════════════════════════════════
+// RECORDS
+// ══════════════════════════════════════
+function renderRecords() {
+  var el = document.getElementById('records-body');
+  if (!el) return;
+
+  if (allData.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F4CB;</div><div class="empty-text">No records yet</div></div>';
+    return;
+  }
+
+  var rows = allData.slice().reverse().map(function(d) {
+    var dateStr = new Date(d.date+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+    return '<tr>'
+      + '<td style="color:#C0392B;font-weight:600">'+dateStr+'</td>'
+      + '<td style="color:#27AE60">'+d.answered+'</td>'
+      + '<td style="color:#2980B9">'+d.outbound+'</td>'
+      + '<td style="color:#C0392B">'+d.missed+'</td>'
+      + '<td style="color:#F39C12">'+d.sla+'%</td>'
+      + '<td style="color:#E67E22">'+d.abandonRate+'%</td>'
+      + '<td style="color:#9B59B6">'+d.avgHandle+' min</td>'
+      + '<td style="color:#555;font-size:11px">'+(d.addedBy||'—')+'</td>'
+      + '<td><button class="del-btn" onclick="askDelete(\''+d.date+'\')">Delete</button></td>'
+      + '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="tbl-card">'
+    + '<table><thead><tr>'
+    + '<th>Date</th><th>Answered</th><th>Outbound</th><th>Missed</th>'
+    + '<th>SLA%</th><th>Abandon%</th><th>Handle</th><th>By</th><th></th>'
+    + '</tr></thead><tbody>'+rows+'</tbody></table>'
+    + '<div style="margin-top:12px;font-size:11px;color:#333;text-align:right">'+allData.length+' entries — synced live &#x26A1;</div>'
+    + '</div>';
+}
+
+function askDelete(date) {
+  var rows = document.querySelectorAll('#records-body tr');
+  var fmtD = new Date(date+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  rows.forEach(function(row) {
+    if (row.cells[0] && row.cells[0].textContent.trim() === fmtD) {
+      var last = row.cells[row.cells.length-1];
+      last.innerHTML = '<button class="del-yes" onclick="doDelete(\''+date+'\')">Confirm</button>'
+                     + '<button class="del-no" onclick="renderRecords()">Cancel</button>';
+    }
+  });
+}
+
+function doDelete(date) {
+  db.ref('daily_entries/'+date).remove()
+    .then(function(){ renderRecords(); })
+    .catch(function(err){ alert('Delete failed: ' + err.message); });
+}
+</script>
+</body>
+</html>
